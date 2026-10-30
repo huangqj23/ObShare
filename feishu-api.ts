@@ -1,4 +1,4 @@
-import { App, TFile, requestUrl, RequestUrlParam } from 'obsidian';
+import { App, Notice, TFile, requestUrl, RequestUrlParam } from 'obsidian';
 import { SvgConverter } from './svg-converter';
 
 // 飞书API响应接口
@@ -1121,6 +1121,15 @@ export class FeishuApiClient {
             // 找到图片块
             const imageBlocks = blocks.filter(block => block.block_type === 27); // 27表示图片块
             
+            // 图片块比笔记里的图片少时，多出来的图片不会上传，必须明确提示，不能静默跳过
+            if (imageBlocks.length < imageInfos.length) {
+                const missing = imageInfos.length - imageBlocks.length;
+                const warning = `文档中只找到 ${imageBlocks.length} 个图片块，笔记里有 ${imageInfos.length} 张图片，最后 ${missing} 张不会上传`;
+                console.warn(`[飞书API] ${warning}`);
+                onProgress?.(`警告：${warning}`);
+                new Notice(`ObShare：${warning}`, 10000);
+            }
+
             if (imageBlocks.length === 0) {
                 return;
             }

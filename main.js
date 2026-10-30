@@ -1033,6 +1033,13 @@ var _FeishuApiClient = class {
       onProgress == null ? void 0 : onProgress("\u6B63\u5728\u83B7\u53D6\u6587\u6863\u7ED3\u6784...");
       const blocks = await this.getDocumentBlocks(documentId);
       const imageBlocks = blocks.filter((block) => block.block_type === 27);
+      if (imageBlocks.length < imageInfos.length) {
+        const missing = imageInfos.length - imageBlocks.length;
+        const warning = `\u6587\u6863\u4E2D\u53EA\u627E\u5230 ${imageBlocks.length} \u4E2A\u56FE\u7247\u5757\uFF0C\u7B14\u8BB0\u91CC\u6709 ${imageInfos.length} \u5F20\u56FE\u7247\uFF0C\u6700\u540E ${missing} \u5F20\u4E0D\u4F1A\u4E0A\u4F20`;
+        console.warn(`[\u98DE\u4E66API] ${warning}`);
+        onProgress == null ? void 0 : onProgress(`\u8B66\u544A\uFF1A${warning}`);
+        new import_obsidian.Notice(`ObShare\uFF1A${warning}`, 1e4);
+      }
       if (imageBlocks.length === 0) {
         return;
       }
