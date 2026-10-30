@@ -911,52 +911,68 @@ export class FeishuApiClient {
      */
     async getDocumentBlocks(documentId: string): Promise<DocumentBlock[]> {
         const token = await this.getAccessToken();
-        const url = `${this.baseUrl}/docx/v1/documents/${documentId}/blocks`;
-        
-        const requestParam: RequestUrlParam = {
-            url,
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json; charset=utf-8'
-            }
-        };
-        
+        const baseUrl = `${this.baseUrl}/docx/v1/documents/${documentId}/blocks`;
+        const allBlocks: DocumentBlock[] = [];
+        let pageToken: string | undefined;
+        let hasMore = true;
+
         try {
-            const response = await requestUrl(requestParam);
-            // 增加API调用计数
-            this.apiCallCountCallback?.();
-            
-            const result: FeishuApiResponse<DocumentBlocksResponse> = response.json;
-            
-            if (result.code !== 0) {
-                console.error('[飞书API] 获取文档块失败:', result.msg);
-                this.debug('[飞书API] 获取文档块失败，错误详情:', {
-                    code: result.code,
-                    msg: result.msg,
-                    fullResult: result
-                });
-                throw new Error(`获取文档块失败: [${result.code}] ${result.msg}`);
+            // 飞书单页最多返回500个块，超过后必须带 page_token 翻页，
+            // 否则靠后的图片块取不到，对应图片就传不上去
+            while (hasMore) {
+                const params: Record<string, string> = { page_size: '500' };
+                if (pageToken) {
+                    params['page_token'] = pageToken;
+                }
+
+                const requestParam: RequestUrlParam = {
+                    url: `${baseUrl}?${new URLSearchParams(params).toString()}`,
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json; charset=utf-8'
+                    }
+                };
+
+                const response = await requestUrl(requestParam);
+                // 增加API调用计数
+                this.apiCallCountCallback?.();
+
+                const result: FeishuApiResponse<DocumentBlocksResponse> = response.json;
+
+                if (result.code !== 0) {
+                    console.error('[飞书API] 获取文档块失败:', result.msg);
+                    this.debug('[飞书API] 获取文档块失败，错误详情:', {
+                        code: result.code,
+                        msg: result.msg,
+                        fullResult: result
+                    });
+                    throw new Error(`获取文档块失败: [${result.code}] ${result.msg}`);
+                }
+
+                if (!result.data || !result.data.items) {
+                    console.error('[飞书API] 响应中缺少items');
+                    this.debug('[飞书API] 响应中缺少items:', result);
+                    throw new Error('获取成功但未返回文档块数据');
+                }
+
+                allBlocks.push(...result.data.items);
+                hasMore = !!result.data.has_more && !!result.data.page_token;
+                pageToken = result.data.page_token;
             }
-            
-            if (!result.data || !result.data.items) {
-                console.error('[飞书API] 响应中缺少items');
-                this.debug('[飞书API] 响应中缺少items:', result);
-                throw new Error('获取成功但未返回文档块数据');
-            }
-            
-            return result.data.items;
+
+            return allBlocks;
         } catch (error) {
             this.logError('[飞书API] 获取文档块失败:', error, {
-                requestUrl: url,
+                requestUrl: baseUrl,
                 hasToken: !!token
             });
-            
+
             const errorMessage = error instanceof Error ? error.message : String(error);
             throw new Error(`获取文档块失败: ${errorMessage}`);
         }
     }
-    
+
     /**
      * 更新文档块
      * @param documentId 文档ID

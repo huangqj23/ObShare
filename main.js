@@ -873,37 +873,49 @@ var _FeishuApiClient = class {
   async getDocumentBlocks(documentId) {
     var _a;
     const token = await this.getAccessToken();
-    const url = `${this.baseUrl}/docx/v1/documents/${documentId}/blocks`;
-    const requestParam = {
-      url,
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json; charset=utf-8"
-      }
-    };
+    const baseUrl = `${this.baseUrl}/docx/v1/documents/${documentId}/blocks`;
+    const allBlocks = [];
+    let pageToken;
+    let hasMore = true;
     try {
-      const response = await (0, import_obsidian.requestUrl)(requestParam);
-      (_a = this.apiCallCountCallback) == null ? void 0 : _a.call(this);
-      const result = response.json;
-      if (result.code !== 0) {
-        console.error("[\u98DE\u4E66API] \u83B7\u53D6\u6587\u6863\u5757\u5931\u8D25:", result.msg);
-        this.debug("[\u98DE\u4E66API] \u83B7\u53D6\u6587\u6863\u5757\u5931\u8D25\uFF0C\u9519\u8BEF\u8BE6\u60C5:", {
-          code: result.code,
-          msg: result.msg,
-          fullResult: result
-        });
-        throw new Error(`\u83B7\u53D6\u6587\u6863\u5757\u5931\u8D25: [${result.code}] ${result.msg}`);
+      while (hasMore) {
+        const params = { page_size: "500" };
+        if (pageToken) {
+          params["page_token"] = pageToken;
+        }
+        const requestParam = {
+          url: `${baseUrl}?${new URLSearchParams(params).toString()}`,
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json; charset=utf-8"
+          }
+        };
+        const response = await (0, import_obsidian.requestUrl)(requestParam);
+        (_a = this.apiCallCountCallback) == null ? void 0 : _a.call(this);
+        const result = response.json;
+        if (result.code !== 0) {
+          console.error("[\u98DE\u4E66API] \u83B7\u53D6\u6587\u6863\u5757\u5931\u8D25:", result.msg);
+          this.debug("[\u98DE\u4E66API] \u83B7\u53D6\u6587\u6863\u5757\u5931\u8D25\uFF0C\u9519\u8BEF\u8BE6\u60C5:", {
+            code: result.code,
+            msg: result.msg,
+            fullResult: result
+          });
+          throw new Error(`\u83B7\u53D6\u6587\u6863\u5757\u5931\u8D25: [${result.code}] ${result.msg}`);
+        }
+        if (!result.data || !result.data.items) {
+          console.error("[\u98DE\u4E66API] \u54CD\u5E94\u4E2D\u7F3A\u5C11items");
+          this.debug("[\u98DE\u4E66API] \u54CD\u5E94\u4E2D\u7F3A\u5C11items:", result);
+          throw new Error("\u83B7\u53D6\u6210\u529F\u4F46\u672A\u8FD4\u56DE\u6587\u6863\u5757\u6570\u636E");
+        }
+        allBlocks.push(...result.data.items);
+        hasMore = !!result.data.has_more && !!result.data.page_token;
+        pageToken = result.data.page_token;
       }
-      if (!result.data || !result.data.items) {
-        console.error("[\u98DE\u4E66API] \u54CD\u5E94\u4E2D\u7F3A\u5C11items");
-        this.debug("[\u98DE\u4E66API] \u54CD\u5E94\u4E2D\u7F3A\u5C11items:", result);
-        throw new Error("\u83B7\u53D6\u6210\u529F\u4F46\u672A\u8FD4\u56DE\u6587\u6863\u5757\u6570\u636E");
-      }
-      return result.data.items;
+      return allBlocks;
     } catch (error) {
       this.logError("[\u98DE\u4E66API] \u83B7\u53D6\u6587\u6863\u5757\u5931\u8D25:", error, {
-        requestUrl: url,
+        requestUrl: baseUrl,
         hasToken: !!token
       });
       const errorMessage = error instanceof Error ? error.message : String(error);
